@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="열·약 기록" />
+  <meta name="theme-color" content="#eff6ff" />
+  <title>하은·희수 열·약 기록</title>
+  <style>
+    :root {
+      --blue:#3B82F6;
+      --green:#10B981;
+      --red:#EF4444;
+      --orange:#F97316;
+      --gray:#6B7280;
+      --light:#F3F4F6;
+      --ink:#1E3A5F;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #EFF6FF 0%, #FFF7ED 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      color: #374151;
+      padding: max(14px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom));
+    }
+    .app {
+      width: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.10);
+      padding: 22px 18px;
+    }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .title {
+      font-size: 23px;
+      font-weight: 900;
+      color: var(--ink);
+      letter-spacing: -0.7px;
+    }
+    .sub {
+      margin-top: 2px;
+      font-size: 13px;
+      color: #9CA3AF;
+    }
+    button, input, select {
+      font-family: inherit;
+      font-size: 16px;
+    }
+    button {
+      border: 0;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .hist-btn {
+      background: #EFF6FF;
+      color: var(--blue);
+      border-radius: 13px;
+      padding: 9px 13px;
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .kid-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 13px;
+      margin-bottom: 14px;
+    }
+    .kid-card {
+      background: linear-gradient(135deg, #F0F9FF 0%, #FFF7ED 100%);
+      border: 2px solid #E5E7EB;
+      border-radius: 19px;
+      padding: 17px 10px;
+      text-align: center;
+      min-height: 158px;
+    }
+    .kid-name {
+      font-size: 19px;
+      font-weight: 900;
+      color: var(--ink);
+      margin-bottom: 5px;
+    }
+    .kid-temp {
+      font-size: 31px;
+      line-height: 1;
+      font-weight: 900;
+      margin: 4px 0;
+    }
+    .kid-med {
+      min-height: 32px;
+      font-size: 12px;
+      color: #6B7280;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.25;
+      word-break: keep-all;
+    }
+    .kid-time {
+      font-size: 11px;
+      color: #9CA3AF;
+      margin-top: 2px;
+    }
+    .plus-hint {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--blue);
+      font-weight: 800;
+      background: #EFF6FF;
+      border-radius: 8px;
+      padding: 3px 10px;
+    }
+    .total-badge {
+      text-align: center;
+      color: #9CA3AF;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .back-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: var(--light);
+      color: #374151;
+      font-size: 20px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+    .screen-title {
+      color: var(--ink);
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: -0.4px;
+    }
+    .section {
+      margin-bottom: 19px;
+    }
+    .section-label {
+      font-size: 14px;
+      font-weight: 900;
+      color: #6B7280;
+      margin-bottom: 10px;
+    }
+    .selector-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .datetime-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .datetime-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .datetime-field label {
+      font-size: 12px;
+      color: #6B7280;
+      font-weight: 850;
+    }
+    .datetime-field input {
+      width: 100%;
+      border: 2px solid #E5E7EB;
+      background: #F9FAFB;
+      border-radius: 13px;
+      padding: 11px 10px;
+      color: #374151;
+      font-weight: 850;
+      min-height: 45px;
+    }
+    .select-btn {
+      flex: 1;
+      padding: 10px 0;
+      border-radius: 12px;
+      font-weight: 900;
+      background: var(--light);
+      color: #374151;
+    }
+    .select-btn.active {
+      background: var(--blue);
+      color: #fff;
+    }
+    .temp-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      margin: 8px 0 13px;
+    }
+    .temp-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      border: 2px solid #E5E7EB;
+      background: #F9FAFB;
+      color: #374151;
+      font-size: 26px;
+      font-weight: 900;
+    }
+    .temp-display {
+      min-width: 130px;
+      text-align: center;
+      font-size: 54px;
+      line-height: 1;
+      font-weight: 950;
+      letter-spacing: -2px;
+    }
+    .quick-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 7px;
+    }
+    .quick-temp {
+      padding: 7px 10px;
+      border-radius: 10px;
+      background: var(--light);
+      color: #374151;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .quick-temp.active {
+      color: #fff;
+      font-weight: 900;
+    }
+    .med-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .med-btn {
+      min-height: 72px;
+      border: 2px solid #E5E7EB;
+      background: #F9FAFB;
+      border-radius: 15px;
+      padding: 12px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font-weight: 850;
+      font-size: 13px;
+      color: #374151;
+      transition: transform .12s ease;
+    }
+    .med-btn .emoji { font-size: 22px; line-height: 1; }
+    .med-btn.active {
+      color: #fff;
+      transform: scale(1.03);
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 17px;
+      border-radius: 17px;
+      background: var(--blue);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 950;
+      margin-top: 3px;
+    }
+    .submit-btn:disabled {
+      background: #D1D5DB;
+      cursor: default;
+    }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: calc(100vh - 190px);
+      overflow-y: auto;
+      padding-bottom: 4px;
+    }
+    .hist-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #F9FAFB;
+      border-radius: 15px;
+      padding: 12px 12px;
+    }
+    .hist-left {
+      min-width: 52px;
+      text-align: center;
+    }
+    .hist-kid {
+      font-size: 13px;
+      color: var(--ink);
+      font-weight: 950;
+    }
+    .hist-temp {
+      font-size: 23px;
+      line-height: 1.1;
+      font-weight: 950;
+    }
+    .hist-mid {
+      flex: 1;
+      min-width: 0;
+    }
+    .hist-med {
+      font-size: 13px;
+      font-weight: 850;
+      color: #374151;
+      line-height: 1.25;
+      word-break: keep-all;
+    }
+    .hist-time {
+      font-size: 12px;
+      color: #9CA3AF;
+      margin-top: 3px;
+    }
+    .action-row {
+      display: flex;
+      gap: 5px;
+    }
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      font-size: 15px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .edit-btn {
+      background: #EFF6FF;
+      color: var(--blue);
+    }
+    .del-btn {
+      background: #FEF2F2;
+      color: var(--red);
+    }
+    .confirm-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .confirm-row button {
+      border-radius: 8px;
+      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .yes {
+      background: var(--red);
+      color: white;
+    }
+    .no {
+      background: #E5E7EB;
+      color: #374151;
+    }
+    .empty {
+      color: #9CA3AF;
+      text-align: center;
+      padding: 42px 0;
+      font-size: 14px;
+    }
+    .utility-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .utility-row button {
+      background: #F3F4F6;
+      color: #374151;
+      border-radius: 13px;
+      padding: 11px 6px;
+      font-weight: 850;
+      font-size: 13px;
+    }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(22px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      background: rgba(17, 24, 39, .92);
+      color: white;
+      padding: 12px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 800;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+      z-index: 10;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+    .danger-note {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #9CA3AF;
+      text-align: center;
+      line-height: 1.45;
+    }
+    @media (max-width: 360px) {
+      .app { padding: 20px 14px; }
+      .title { font-size: 21px; }
+      .temp-display { font-size: 48px; min-width: 116px; }
+      .temp-btn { width: 48px; height: 48px; }
+      .med-btn { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app"></main>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = "fever-tracker-records-v1";
+    const KIDS = ["하은", "희수"];
+    const MED_OPTIONS = [
+      { id: "none", label: "약 안먹음", emoji: "💧", color: "#6B7280" },
+      { id: "cough", label: "기침약", emoji: "🌿", color: "#10B981" },
+      { id: "cough+brufen", label: "기침약+부루펜", emoji: "🔵", color: "#3B82F6" },
+      { id: "cough+tylenol", label: "기침약+타이레놀", emoji: "🔴", color: "#EF4444" },
+    ];
+
+    let state = {
+      view: "home",
+      records: [],
+      selectedKid: null,
+      temp: "37.0",
+      med: null,
+      filterKid: "전체",
+      deleteConfirm: null,
+      editingId: null,
+      editDate: "",
+      editTime: ""
+    };
+
+    const app = document.getElementById("app");
+    const toast = document.getElementById("toast");
+
+    function loadRecords() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        state.records = raw ? JSON.parse(raw) : [];
+      } catch {
+        state.records = [];
+      }
+    }
+
+    function saveRecords(next) {
+      state.records = next;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      render();
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1000);
+    }
+
+    function getMed(id) {
+      return MED_OPTIONS.find(m => m.id === id) || { label: id, emoji: "❓", color: "#888" };
+    }
+
+    function tempColor(temp) {
+      const t = parseFloat(temp);
+      if (t >= 38.5) return "#EF4444";
+      if (t >= 37.5) return "#F97316";
+      return "#10B981";
+    }
+
+    function formatDate(ts) {
+      const d = new Date(ts);
+      const m = d.getMonth() + 1;
+      const day = d.getDate();
+      const h = String(d.getHours()).padStart(2, "0");
+      const min = String(d.getMinutes()).padStart(2, "0");
+      return { date: `${m}/${day}`, time: `${h}:${min}` };
+    }
+
+    function toDateInputValue(ts) {
+      const d = new Date(ts);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function toTimeInputValue(ts) {
+      const d = new Date(ts);
+      const h = String(d.getHours()).padStart(2, "0");
+      const min = String(d.getMinutes()).padStart(2, "0");
+      return `${h}:${min}`;
+    }
+
+    function buildIsoFromDateTime(dateValue, timeValue, fallbackTs) {
+      if (!dateValue || !timeValue) return fallbackTs;
+      const [y, m, d] = dateValue.split("-").map(Number);
+      const [h, min] = timeValue.split(":").map(Number);
+      const next = new Date(y, m - 1, d, h, min, 0, 0);
+      if (Number.isNaN(next.getTime())) return fallbackTs;
+      return next.toISOString();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setView(view) {
+      state.view = view;
+      state.deleteConfirm = null;
+      render();
+    }
+
+    function startInput(kid) {
+      state.selectedKid = kid;
+      state.temp = "37.0";
+      state.med = null;
+      state.editingId = null;
+      state.editDate = "";
+      state.editTime = "";
+      state.view = "input";
+      render();
+    }
+
+    function startEdit(id) {
+      const record = state.records.find(r => r.id === id);
+      if (!record) return;
+      state.editingId = id;
+      state.selectedKid = record.kid;
+      state.temp = record.temp;
+      state.med = record.med;
+      state.editDate = toDateInputValue(record.ts);
+      state.editTime = toTimeInputValue(record.ts);
+      state.deleteConfirm = null;
+      state.view = "edit";
+      render();
+    }
+
+    function adjustTemp(delta) {
+      const parsed = parseFloat(state.temp);
+      const base = Number.isNaN(parsed) ? 37 : parsed;
+      const next = Math.round((base + delta) * 10) / 10;
+      state.temp = Math.min(42, Math.max(35, next)).toFixed(1);
+      render();
+    }
+
+    function submitRecord() {
+      if (!state.selectedKid || !state.med) return;
+      const rec = {
+        id: Date.now(),
+        kid: state.selectedKid,
+        temp: state.temp,
+        med: state.med,
+        ts: new Date().toISOString()
+      };
+      saveRecords([rec, ...state.records]);
+      showToast("✅ 저장되었습니다");
+      state.view = "home";
+      render();
+    }
+
+    function updateRecord() {
+      if (!state.editingId || !state.selectedKid || !state.med) return;
+      const next = state.records.map(r => {
+        if (r.id !== state.editingId) return r;
+        return {
+          ...r,
+          kid: state.selectedKid,
+          temp: state.temp,
+          med: state.med,
+          ts: buildIsoFromDateTime(state.editDate, state.editTime, r.ts),
+          updatedAt: new Date().toISOString()
+        };
+      });
+      saveRecords(next);
+      showToast("✅ 수정되었습니다");
+      state.view = "history";
+      state.editingId = null;
+      render();
+    }
+
+    function deleteRecord(id) {
+      const next = state.records.filter(r => r.id !== id);
+      saveRecords(next);
+      state.deleteConfirm = null;
+      showToast("삭제되었습니다");
+    }
+
+    function lastByKid(kid) {
+      return state.records.find(r => r.kid === kid);
+    }
+
+    function homeHtml() {
+      const kidsHtml = KIDS.map(kid => {
+        const last = lastByKid(kid);
+        if (!last) {
+          return `
+            <button class="kid-card" onclick="startInput('${kid}')">
+              <div class="kid-name">${kid}</div>
+              <div class="kid-med" style="margin-top:18px;">기록 없음</div>
+              <div class="plus-hint">+ 기록</div>
+            </button>
+          `;
+        }
+        const med = getMed(last.med);
+        const dt = formatDate(last.ts);
+        return `
+          <button class="kid-card" onclick="startInput('${kid}')">
+            <div class="kid-name">${kid}</div>
+            <div class="kid-temp" style="color:${tempColor(last.temp)}">${escapeHtml(last.temp)}°</div>
+            <div class="kid-med">${med.emoji} ${escapeHtml(med.label)}</div>
+            <div class="kid-time">${dt.date} ${dt.time}</div>
+            <div class="plus-hint">+ 기록</div>
+          </button>
+        `;
+      }).join("");
+
+      return `
+        <div class="header-row">
+          <div>
+            <div class="title">🌡️ 열·약 기록</div>
+            <div class="sub">하은 &amp; 희수</div>
+          </div>
+          <button class="hist-btn" onclick="setView('history')">📋 이력</button>
+        </div>
+        <div class="kid-grid">${kidsHtml}</div>
+        <div class="total-badge">총 ${state.records.length}건 누적</div>
+        <div class="utility-row">
+          <button onclick="copyToday()">오늘 기록 복사</button>
+          <button onclick="exportCsv()">CSV 내보내기</button>
+        </div>
+        <div class="danger-note">
+          기록은 현재 스마트폰 브라우저에 저장됩니다. 브라우저 데이터 삭제 시 기록도 지워질 수 있습니다.
+        </div>
+      `;
+    }
+
+    function formHtml(mode) {
+      const isEdit = mode === "edit";
+      const title = isEdit ? "기록 수정" : `${state.selectedKid} 기록 입력`;
+      const submitText = isEdit ? "수정 저장" : "기록 저장";
+      const submitAction = isEdit ? "updateRecord()" : "submitRecord()";
+      const backAction = isEdit ? "setView('history')" : "setView('home')";
+      const color = tempColor(state.temp);
+
+      const kidSelector = isEdit ? `
+        <div class="section">
+          <div class="section-label">👧 아이 선택</div>
+          <div class="selector-row">
+            ${KIDS.map(kid => `
+              <button class="select-btn ${state.selectedKid === kid ? "active" : ""}" onclick="state.selectedKid='${kid}'; render();">
+                ${kid}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      ` : "";
+
+      const dateTimeEditor = isEdit ? `
+        <div class="section">
+          <div class="section-label">🕒 기록 날짜·시간</div>
+          <div class="datetime-row">
+            <div class="datetime-field">
+              <label>날짜</label>
+              <input type="date" value="${escapeHtml(state.editDate)}" onchange="state.editDate=this.value">
+            </div>
+            <div class="datetime-field">
+              <label>시간</label>
+              <input type="time" value="${escapeHtml(state.editTime)}" onchange="state.editTime=this.value">
+            </div>
+          </div>
+        </div>
+      ` : "";
+
+      const quickTemps = ["36.5", "37.0", "37.5", "38.0", "38.5", "39.0"].map(t => `
+        <button class="quick-temp ${state.temp === t ? "active" : ""}"
+          style="${state.temp === t ? `background:${color}` : ""}"
+          onclick="state.temp='${t}'; render();">${t}°</button>
+      `).join("");
+
+      const medBtns = MED_OPTIONS.map(m => `
+        <button class="med-btn ${state.med === m.id ? "active" : ""}"
+          style="${state.med === m.id ? `background:${m.color}; border-color:${m.color};` : ""}"
+          onclick="state.med='${m.id}'; render();">
+          <span class="emoji">${m.emoji}</span>
+          <span>${m.label}</span>
+        </button>
+      `).join("");
+
+      return `
+        <div class="topbar">
+          <button class="back-btn" onclick="${backAction}">←</button>
+          <div class="screen-title">${escapeHtml(title)}</div>
+        </div>
+
+        ${kidSelector}
+        ${dateTimeEditor}
+
+        <div class="section">
+          <div class="section-label">🌡️ 체온</div>
+          <div class="temp-row">
+            <button class="temp-btn" onclick="adjustTemp(-0.1)">−</button>
+            <div class="temp-display" style="color:${color}">${escapeHtml(state.temp)}°</div>
+            <button class="temp-btn" onclick="adjustTemp(0.1)">+</button>
+          </div>
+          <div class="quick-row">${quickTemps}</div>
+        </div>
+
+        <div class="section">
+          <div class="section-label">💊 투약</div>
+          <div class="med-grid">${medBtns}</div>
+        </div>
+
+        <button class="submit-btn" onclick="${submitAction}" ${!state.med ? "disabled" : ""}>
+          ${submitText}
+        </button>
+      `;
+    }
+
+    function historyHtml() {
+      const filterBtns = ["전체", ...KIDS].map(k => `
+        <button class="select-btn ${state.filterKid === k ? "active" : ""}"
+          onclick="state.filterKid='${k}'; render();">${k}</button>
+      `).join("");
+
+      const filtered = state.filterKid === "전체"
+        ? state.records
+        : state.records.filter(r => r.kid === state.filterKid);
+
+      const list = filtered.length === 0
+        ? `<div class="empty">기록이 없습니다</div>`
+        : `<div class="history-list">${filtered.map(r => {
+            const med = getMed(r.med);
+            const dt = formatDate(r.ts);
+            const edited = r.updatedAt ? " · 수정됨" : "";
+            const action = state.deleteConfirm === r.id
+              ? `<div class="confirm-row">
+                   <button class="yes" onclick="deleteRecord(${r.id})">삭제</button>
+                   <button class="no" onclick="state.deleteConfirm=null; render();">취소</button>
+                 </div>`
+              : `<div class="action-row">
+                   <button class="icon-btn edit-btn" onclick="startEdit(${r.id})">✏️</button>
+                   <button class="icon-btn del-btn" onclick="state.deleteConfirm=${r.id}; render();">🗑</button>
+                 </div>`;
+            return `
+              <div class="hist-item">
+                <div class="hist-left">
+                  <div class="hist-kid">${escapeHtml(r.kid)}</div>
+                  <div class="hist-temp" style="color:${tempColor(r.temp)}">${escapeHtml(r.temp)}°</div>
+                </div>
+                <div class="hist-mid">
+                  <div class="hist-med"><span style="color:${med.color}">${med.emoji}</span> ${escapeHtml(med.label)}</div>
+                  <div class="hist-time">${dt.date} ${dt.time}${edited}</div>
+                </div>
+                ${action}
+              </div>
+            `;
+          }).join("")}</div>`;
+
+      return `
+        <div class="topbar">
+          <button class="back-btn" onclick="setView('home')">←</button>
+          <div class="screen-title">기록 이력</div>
+        </div>
+        <div class="selector-row">${filterBtns}</div>
+        ${list}
+      `;
+    }
+
+    function todayRecords() {
+      const now = new Date();
+      return state.records.filter(r => {
+        const d = new Date(r.ts);
+        return d.getFullYear() === now.getFullYear()
+          && d.getMonth() === now.getMonth()
+          && d.getDate() === now.getDate();
+      }).slice().reverse();
+    }
+
+    function copyToday() {
+      const rows = todayRecords();
+      if (rows.length === 0) {
+        showToast("오늘 기록이 없습니다");
+        return;
+      }
+      const text = rows.map(r => {
+        const dt = formatDate(r.ts);
+        const med = getMed(r.med);
+        return `${dt.date} ${dt.time} / ${r.kid} / ${r.temp}도 / ${med.label}`;
+      }).join("\n");
+
+      navigator.clipboard.writeText(text)
+        .then(() => showToast("오늘 기록을 복사했습니다"))
+        .catch(() => {
+          prompt("아래 내용을 복사하세요", text);
+        });
+    }
+
+    function exportCsv() {
+      if (state.records.length === 0) {
+        showToast("내보낼 기록이 없습니다");
+        return;
+      }
+      const header = ["입력날짜", "입력시간", "아이이름", "체온", "투약", "수정여부"];
+      const rows = state.records.slice().reverse().map(r => {
+        const dt = formatDate(r.ts);
+        const med = getMed(r.med);
+        return [dt.date, dt.time, r.kid, r.temp, med.label, r.updatedAt ? "수정됨" : ""];
+      });
+      const csv = [header, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replaceAll('"', '""')}"`).join(","))
+        .join("\n");
+      const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "haeun-heesu-fever-records.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast("CSV를 만들었습니다");
+    }
+
+    function render() {
+      if (state.view === "home") app.innerHTML = homeHtml();
+      if (state.view === "input") app.innerHTML = formHtml("input");
+      if (state.view === "edit") app.innerHTML = formHtml("edit");
+      if (state.view === "history") app.innerHTML = historyHtml();
+    }
+
+    window.state = state;
+    window.render = render;
+    window.setView = setView;
+    window.startInput = startInput;
+    window.startEdit = startEdit;
+    window.adjustTemp = adjustTemp;
+    window.submitRecord = submitRecord;
+    window.updateRecord = updateRecord;
+    window.deleteRecord = deleteRecord;
+    window.copyToday = copyToday;
+    window.exportCsv = exportCsv;
+
+    loadRecords();
+    render();
+  </script>
+</body>
+</html>
