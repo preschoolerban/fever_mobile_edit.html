@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#3B82F6" />
+<title>열·약 기록</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;
+  background:linear-gradient(135deg,#EFF6FF 0%,#FFF7ED 100%);
+  font-family:'Apple SD Gothic Neo','Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;
+  color:#1F2937;
+  -webkit-tap-highlight-color:transparent;
+}
+button,input,textarea,select{font-family:inherit}
+button{cursor:pointer}
+button:active{transform:scale(.98)}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:999px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState,useMemo}=React;
+
+const RK="fever-v4-records";
+const KK="fever-v4-kids";
+const OLD_KEYS={
+  recs:["fever-v3-records","fever-v2-records","fever-v1-records","fever-tracker-records"],
+  kids:["fever-v3-kids","fever-v2-kids","fever-v1-kids"]
+};
+
+const MEDS=[
+  {id:"none",label:"약 안먹음",emoji:"💧",color:"#6B7280",group:"none"},
+  {id:"cough",label:"기침약",emoji:"🌿",color:"#10B981",group:"cough"},
+  {id:"brufen",label:"부루펜",emoji:"🔵",color:"#3B82F6",group:"brufen"},
+  {id:"tylenol",label:"타이레놀",emoji:"🔴",color:"#EF4444",group:"tylenol"},
+  {id:"cough+brufen",label:"기침약+부루펜",emoji:"🌿🔵",color:"#6366F1",group:"brufen"},
+  {id:"cough+tylenol",label:"기침약+타이레놀",emoji:"🌿🔴",color:"#EC4899",group:"tylenol"},
+];
+
+const GENDERS={
+  female:{label:"여자",emoji:"👧",accent:"#EC4899",bg:"#FDF2F8",badge:"#FCE7F3"},
+  male:{label:"남자",emoji:"👦",accent:"#3B82F6",bg:"#EFF6FF",badge:"#DBEAFE"},
+  other:{label:"기타",emoji:"🧒",accent:"#8B5CF6",bg:"#F5F3FF",badge:"#EDE9FE"}
+};
+
+const uid=()=>Date.now()+Math.floor(Math.random()*10000);
+const pad=n=>String(n).padStart(2,"0");
+const read=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}};
+const write=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const med=id=>MEDS.find(m=>m.id===id)||MEDS[0];
+const gender=g=>GENDERS[g]||GENDERS.other;
+const level=t=>{const n=parseFloat(t||0);return n>=38.5?"high":n>=37.5?"fever":"normal"};
+const levelText=t=>level(t)==="high"?"고열":level(t)==="fever"?"미열":"보통";
+const levelColor=t=>level(t)==="high"?"#EF4444":level(t)==="fever"?"#F97316":"#10B981";
+
+function fmt(ts){
+  const d=new Date(ts);
+  return {
+    date:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
+    dateKo:`${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`,
+    short:`${d.getMonth()+1}/${d.getDate()}`,
+    time:`${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    weekday:["일","월","화","수","목","금","토"][d.getDay()]
+  };
+}
+function toInput(ts){
+  const d=new Date(ts);
+  return {ds:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,tm:`${pad(d.getHours())}:${pad(d.getMinutes())}`};
+}
+function fromInput(ds,tm){return new Date(`${ds}T${tm}:00`).toISOString();}
+
+function initial(){
+  let kids=read(KK,null);
+  if(!kids){for(const k of OLD_KEYS.kids){kids=read(k,null); if(kids) break;}}
+  let recs=read(RK,null);
+  if(!recs){for(const k of OLD_KEYS.recs){recs=read(k,null); if(recs) break;}}
+  return {
+    kids:Array.isArray(kids)?kids:[],
+    recs:(Array.isArray(recs)?recs:[]).map(r=>({...r,note:r.note||"",med:r.med||"none"}))
+  };
+}
+
+const iconBtn=(bg,color)=>({background:bg,color,border:"none",borderRadius:12,width:38,height:38,fontSize:18,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0});
+const mainBtn=bg=>({width:"100%",padding:"15px",border:"none",borderRadius:16,background:bg,color:"#fff",fontSize:16,fontWeight:900});
+const inputStyle={width:"100%",minWidth:0,maxWidth:"100%",padding:"12px 8px",border:"2px solid #E5E7EB",borderRadius:12,background:"#F9FAFB",fontSize:15,fontWeight:800,color:"#1E3A5F",outline:"none",textAlign:"center",WebkitAppearance:"none",appearance:"none"};
+const pill=(on,color)=>({whiteSpace:"nowrap",border:"none",borderRadius:999,padding:"8px 13px",fontSize:13,fontWeight:900,background:on?color:"#F3F4F6",color:on?"#fff":"#374151"});
+const card={background:"#F9FAFB",border:"1px solid #E5E7EB",borderRadius:16,padding:"12px"};
+const action=(bg,c)=>({flex:1,padding:"10px 5px",border:"none",borderRadius:12,fontSize:12,fontWeight:900,background:bg,color:c,textAlign:"center"});
+
+function Header({title,onBack,right}){
+  return <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+    {onBack&&<button onClick={onBack} style={iconBtn("#F3F4F6","#374151")}>←</button>}
+    <div style={{flex:1,fontSize:19,fontWeight:900,color:"#1E3A5F",letterSpacing:-.5}}>{title}</div>
+    {right}
+  </div>
+}
+function Section({label,children,mb=18}){
+  return <div style={{marginBottom:mb}}>
+    <div style={{fontSize:12,fontWeight:900,color:"#6B7280",marginBottom:9,letterSpacing:.3}}>{label}</div>
+    {children}
+  </div>
+}
+function Empty({text,sub,emoji="👶"}){
+  return <div style={{textAlign:"center",padding:"38px 0",color:"#9CA3AF"}}>
+    <div style={{fontSize:44,marginBottom:10}}>{emoji}</div>
+    <div style={{fontSize:15,fontWeight:900,color:"#6B7280"}}>{text}</div>
+    {sub&&<div style={{fontSize:13,marginTop:4}}>{sub}</div>}
+  </div>
+}
+function TempPicker({temp,setTemp}){
+  const adj=d=>setTemp(p=>(Math.min(42,Math.max(35,Math.round((parseFloat(p||37)+d)*10)/10))).toFixed(1));
+  const c=levelColor(temp);
+  return <>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:18,marginBottom:10}}>
+      <button onClick={()=>adj(-.1)} style={{width:50,height:50,borderRadius:15,border:"2px solid #E5E7EB",background:"#F9FAFB",fontSize:28,fontWeight:900,color:"#374151"}}>−</button>
+      <div style={{fontSize:54,fontWeight:900,minWidth:130,textAlign:"center",lineHeight:1,color:c,letterSpacing:-2}}>{temp}°</div>
+      <button onClick={()=>adj(.1)} style={{width:50,height:50,borderRadius:15,border:"2px solid #E5E7EB",background:"#F9FAFB",fontSize:28,fontWeight:900,color:"#374151"}}>+</button>
+    </div>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
+      {["36.5","37.0","37.5","38.0","38.5","39.0"].map(t=>
+        <button key={t} onClick={()=>setTemp(t)} style={{padding:"7px 10px",border:"none",borderRadius:10,background:temp===t?c:"#F3F4F6",color:temp===t?"#fff":"#374151",fontSize:13,fontWeight:900}}>{t}°</button>
+      )}
+    </div>
+  </>
+}
+function MedPicker({value,setValue}){
+  return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+    {MEDS.map(m=><button key={m.id} onClick={()=>setValue(m.id)} style={{minHeight:74,padding:"10px 5px",borderRadius:13,border:`2px solid ${value===m.id?m.color:"#E5E7EB"}`,background:value===m.id?m.color:"#F9FAFB",color:value===m.id?"#fff":"#374151",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4}}>
+      <span style={{fontSize:20}}>{m.emoji}</span>
+      <span style={{fontSize:11,fontWeight:900,lineHeight:1.25,wordBreak:"keep-all"}}>{m.label}</span>
+    </button>)}
+  </div>
+}
+function LegendBox({bg,color,label,count}){
+  return <div style={{background:bg,color,borderRadius:12,padding:"10px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,fontWeight:900}}>
+    <span>{label}</span><span style={{fontSize:16}}>{count}</span>
+  </div>
+}
+
+function App(){
+  const init=initial();
+  const [kids,setKids]=useState(init.kids);
+  const [recs,setRecs]=useState(init.recs);
+  const [view,setView]=useState(init.kids.length?"home":"kids");
+
+  const now=toInput(new Date().toISOString());
+  const [activeKid,setActiveKid]=useState(null);
+  const [temp,setTemp]=useState("37.0");
+  const [medId,setMedId]=useState(null);
+  const [note,setNote]=useState("");
+  const [ds,setDs]=useState(now.ds);
+  const [tm,setTm]=useState(now.tm);
+  const [edit,setEdit]=useState(null);
+
+  const [hFilter,setHFilter]=useState("today");
+  const [hKid,setHKid]=useState("all");
+  const [dashRange,setDashRange]=useState("7d");
+  const [dashKid,setDashKid]=useState("all");
+
+  const [kidForm,setKidForm]=useState(null);
+  const [kName,setKName]=useState("");
+  const [kGender,setKGender]=useState("female");
+  const [confirm,setConfirm]=useState(null);
+  const [toast,setToast]=useState("");
+
+  const saveKids=n=>{setKids(n);write(KK,n)};
+  const saveRecs=n=>{setRecs(n);write(RK,n)};
+  const show=t=>{setToast(t);setTimeout(()=>setToast(""),1500)};
+  const getKid=id=>kids.find(k=>String(k.id)===String(id));
+  const sorted=useMemo(()=>[...recs].sort((a,b)=>new Date(b.ts)-new Date(a.ts)),[recs]);
+
+  const todayStats=useMemo(()=>{
+    const arr=sorted.filter(r=>fmt(r.ts).date===fmt(new Date()).date);
+    return {
+      cnt:arr.length,
+      fever:arr.filter(r=>parseFloat(r.temp)>=37.5).length,
+      high:arr.length?Math.max(...arr.map(r=>parseFloat(r.temp))).toFixed(1):"-"
+    };
+  },[sorted]);
+
+  const history=useMemo(()=>sorted.filter(r=>{
+    if(hKid!=="all"&&String(r.kidId)!==String(hKid)) return false;
+    const diff=new Date()-new Date(r.ts);
+    if(hFilter==="today") return fmt(r.ts).date===fmt(new Date()).date;
+    if(hFilter==="24h") return diff<=24*60*60*1000;
+    if(hFilter==="fever") return parseFloat(r.temp)>=37.5;
+    return true;
+  }),[sorted,hFilter,hKid]);
+
+  const dashRecs=useMemo(()=>sorted.filter(r=>{
+    if(dashKid!=="all"&&String(r.kidId)!==String(dashKid)) return false;
+    const diff=new Date()-new Date(r.ts);
+    if(dashRange==="today") return fmt(r.ts).date===fmt(new Date()).date;
+    if(dashRange==="7d") return diff<=7*24*60*60*1000;
+    if(dashRange==="30d") return diff<=30*24*60*60*1000;
+    return true;
+  }),[sorted,dashKid,dashRange]);
+
+  const dashSummary=useMemo(()=>{
+    const s={total:dashRecs.length,fever:0,high:0,tylenol:0,brufen:0,cough:0,note:0};
+    dashRecs.forEach(r=>{
+      if(level(r.temp)==="fever") s.fever++;
+      if(level(r.temp)==="high") s.high++;
+      if(r.note?.trim()) s.note++;
+      const g=med(r.med).group;
+      if(g==="tylenol") s.tylenol++;
+      if(g==="brufen") s.brufen++;
+      if(g==="cough") s.cough++;
+    });
+    return s;
+  },[dashRecs]);
+
+  const byKid=useMemo(()=>kids.map(k=>{
+    const arr=dashRecs.filter(r=>String(r.kidId)===String(k.id));
+    return {
+      kid:k,
+      count:arr.length,
+      fever:arr.filter(r=>parseFloat(r.temp)>=37.5).length,
+      high:arr.filter(r=>parseFloat(r.temp)>=38.5).length,
+      note:arr.filter(r=>r.note?.trim()).length,
+      max:arr.length?Math.max(...arr.map(r=>parseFloat(r.temp))).toFixed(1):"-",
+      latest:arr[0]||null
+    };
+  }).filter(x=>dashKid==="all"?x.count>0:String(x.kid.id)===String(dashKid)),[kids,dashRecs,dashKid]);
+
+  const byDate=useMemo(()=>{
+    const map={};
+    dashRecs.forEach(r=>{
+      const f=fmt(r.ts);
+      if(!map[f.date]) map[f.date]={key:f.date,label:`${f.dateKo} (${f.weekday})`,items:[],counts:{high:0,fever:0,tylenol:0,brufen:0,cough:0,note:0}};
+      map[f.date].items.push(r);
+      if(parseFloat(r.temp)>=38.5) map[f.date].counts.high++;
+      if(parseFloat(r.temp)>=37.5) map[f.date].counts.fever++;
+      if(r.note?.trim()) map[f.date].counts.note++;
+      const g=med(r.med).group;
+      if(g==="tylenol") map[f.date].counts.tylenol++;
+      if(g==="brufen") map[f.date].counts.brufen++;
+      if(g==="cough") map[f.date].counts.cough++;
+    });
+    return Object.values(map).sort((a,b)=>new Date(b.key)-new Date(a.key));
+  },[dashRecs]);
+
+  const interval=useMemo(()=>{
+    if(!activeKid||!medId||medId==="none") return null;
+    const g=med(medId).group;
+    const last=sorted.find(r=>String(r.kidId)===String(activeKid.id)&&med(r.med).group===g&&r.med!=="none"&&(!edit||r.id!==edit.id));
+    if(!last) return null;
+    return {...last,diff:(new Date(fromInput(ds,tm))-new Date(last.ts))/(60*60*1000)};
+  },[activeKid,medId,sorted,ds,tm,edit]);
+
+  function openNew(k){
+    const n=toInput(new Date().toISOString());
+    setActiveKid(k); setTemp("37.0"); setMedId(null); setNote(""); setDs(n.ds); setTm(n.tm); setEdit(null); setView("input");
+  }
+  function openEdit(r){
+    const n=toInput(r.ts);
+    setActiveKid(getKid(r.kidId)); setTemp(r.temp); setMedId(r.med); setNote(r.note||""); setDs(n.ds); setTm(n.tm); setEdit(r); setView("input");
+  }
+  function submitRecord(){
+    if(!activeKid||!medId) return;
+    const rec={id:edit?.id||uid(),kidId:activeKid.id,temp,med:medId,note:note.trim(),ts:fromInput(ds,tm)};
+    const next=edit?recs.map(r=>r.id===edit.id?rec:r):[rec,...recs];
+    saveRecs(next.sort((a,b)=>new Date(b.ts)-new Date(a.ts)));
+    show(edit?"수정 완료":"저장 완료");
+    setView(edit?"history":"home");
+  }
+  function deleteRecord(id){saveRecs(recs.filter(r=>r.id!==id));setConfirm(null);show("삭제 완료")}
+  function openKidForm(k){setKidForm(k);setKName(k?.name||"");setKGender(k?.gender||"female");setView("kidForm")}
+  function submitKid(){
+    if(!kName.trim()) return;
+    if(kidForm) saveKids(kids.map(k=>k.id===kidForm.id?{...k,name:kName.trim(),gender:kGender}:k));
+    else saveKids([...kids,{id:uid(),name:kName.trim(),gender:kGender}]);
+    show("저장 완료"); setView("kids");
+  }
+  function deleteKid(id){
+    saveKids(kids.filter(k=>String(k.id)!==String(id)));
+    saveRecs(recs.filter(r=>String(r.kidId)!==String(id)));
+    setConfirm(null); setView("kids");
+  }
+
+  function copyToday(){
+    const arr=sorted.filter(r=>fmt(r.ts).date===fmt(new Date()).date).reverse();
+    if(!arr.length){alert("오늘 기록이 없습니다");return;}
+    let text=`[열·약 기록 ${fmt(new Date()).short}]\n시간 | 이름 | 체온 | 상태 | 투약 | 메모\n`;
+    arr.forEach(r=>{const k=getKid(r.kidId),f=fmt(r.ts);text+=`${f.time} | ${k?.name||"??"} | ${r.temp}° | ${levelText(r.temp)} | ${med(r.med).label} | ${r.note||"-"}\n`;});
+    const fallback=()=>{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);show("복사 완료")};
+    if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(()=>show("복사 완료")).catch(fallback); else fallback();
+  }
+  function exportCSV(){
+    const rows=[["날짜","시간","이름","구분","체온","상태","투약","메모"]];
+    [...sorted].reverse().forEach(r=>{const k=getKid(r.kidId),f=fmt(r.ts);rows.push([f.dateKo,f.time,k?.name||"??",gender(k?.gender).label,r.temp,levelText(r.temp),med(r.med).label,r.note||""]);});
+    const csv="\uFEFF"+rows.map(row=>row.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=`열약기록_${fmt(new Date()).date}.csv`; a.click(); URL.revokeObjectURL(url);
+  }
+  function exportJSON(){
+    const blob=new Blob([JSON.stringify({kids,recs},null,2)],{type:"application/json"}); const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=`열약기록_백업_${fmt(new Date()).date}.json`; a.click(); URL.revokeObjectURL(url);
+  }
+  function importJSON(e){
+    const file=e.target.files?.[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const data=JSON.parse(reader.result);
+        if(!Array.isArray(data.kids)||!Array.isArray(data.recs)) throw new Error();
+        saveKids(data.kids); saveRecs(data.recs.map(r=>({...r,note:r.note||""}))); show("백업 불러오기 완료"); setView("home");
+      }catch{alert("백업 파일 형식이 맞지 않습니다");}
+    };
+    reader.readAsText(file); e.target.value="";
+  }
+
+  return <div style={{minHeight:"100vh",display:"flex",justifyContent:"center",padding:"16px 0 40px"}}>
+    <div style={{background:"#fff",borderRadius:24,boxShadow:"0 8px 40px rgba(0,0,0,.10)",width:"100%",maxWidth:430,padding:"24px 18px",margin:"0 12px",overflow:"hidden"}}>
+      {toast&&<div style={{position:"sticky",top:0,zIndex:9,marginBottom:12,background:"#111827",color:"#fff",fontSize:13,fontWeight:900,borderRadius:12,padding:"10px",textAlign:"center"}}>{toast}</div>}
+
+      {view==="home"&&<>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+          <div>
+            <div style={{fontSize:23,fontWeight:900,color:"#1E3A5F",letterSpacing:-.6}}>🌡️ 열·약 기록</div>
+            <div style={{fontSize:13,color:"#9CA3AF",marginTop:2}}>{kids.length}명 등록 · 누적 {recs.length}건</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setView("dashboard")} style={{background:"#F5F3FF",color:"#7C3AED",border:"none",borderRadius:12,padding:"8px 11px",fontSize:14,fontWeight:900}}>📊</button>
+            <button onClick={()=>setView("history")} style={{background:"#EFF6FF",color:"#3B82F6",border:"none",borderRadius:12,padding:"8px 11px",fontSize:14,fontWeight:900}}>📋</button>
+            <button onClick={()=>setView("kids")} style={{background:"#F3F4F6",color:"#6B7280",border:"none",borderRadius:12,padding:"8px 11px",fontSize:14,fontWeight:900}}>⚙️</button>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:18}}>
+          {[
+            {k:"오늘 기록",v:todayStats.cnt,b:"#EFF6FF",c:"#2563EB"},
+            {k:"미열 이상",v:todayStats.fever,b:"#FFF7ED",c:"#EA580C"},
+            {k:"최고 체온",v:todayStats.high==="-"?"-":`${todayStats.high}°`,b:"#FEF2F2",c:"#DC2626"}
+          ].map(x=><div key={x.k} style={{background:x.b,borderRadius:15,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:12,color:"#6B7280",fontWeight:900}}>{x.k}</div><div style={{fontSize:20,color:x.c,fontWeight:900,marginTop:2}}>{x.v}</div></div>)}
+        </div>
+
+        {kids.length===0?<Empty text="등록된 아이가 없어요" sub="설정에서 먼저 아이를 추가해 주세요"/>:
+        <div style={{display:"grid",gridTemplateColumns:kids.length===1?"1fr":"1fr 1fr",gap:12}}>
+          {kids.map(k=>{
+            const c=gender(k.gender), last=sorted.find(r=>String(r.kidId)===String(k.id)), f=last&&fmt(last.ts);
+            return <button key={k.id} onClick={()=>openNew(k)} style={{background:`linear-gradient(135deg,${c.bg} 0%,#FFF7ED 100%)`,border:"2px solid #E5E7EB",borderRadius:18,padding:"15px 8px",textAlign:"center"}}>
+              <div style={{fontSize:30}}>{c.emoji}</div>
+              <div style={{fontSize:17,fontWeight:900,color:"#1E3A5F"}}>{k.name}</div>
+              <div style={{display:"inline-block",fontSize:11,color:c.accent,background:c.badge,borderRadius:8,padding:"2px 8px",fontWeight:900,margin:"3px 0 7px"}}>{c.label}</div>
+              {last?<>
+                <div style={{fontSize:30,fontWeight:900,color:levelColor(last.temp),lineHeight:1}}>{last.temp}°</div>
+                <div style={{fontSize:11,color:"#6B7280",fontWeight:800,marginTop:4}}>{med(last.med).emoji} {med(last.med).label}</div>
+                <div style={{fontSize:10,color:"#9CA3AF"}}>{f.short} {f.time}</div>
+              </>:<div style={{fontSize:13,color:"#9CA3AF",padding:"12px 0"}}>기록 없음</div>}
+              <div style={{marginTop:8,fontSize:13,color:c.accent,fontWeight:900,background:c.badge,borderRadius:10,padding:"5px 0"}}>+ 기록하기</div>
+            </button>
+          })}
+        </div>}
+      </>}
+
+      {view==="dashboard"&&<>
+        <Header title="대시보드" onBack={()=>setView("home")} right={<button onClick={()=>{setDashRange("7d");setDashKid("all")}} style={{background:"#F3F4F6",color:"#374151",border:"none",borderRadius:10,padding:"8px 10px",fontSize:12,fontWeight:900}}>초기화</button>}/>
+        <Section label="조회 조건" mb={12}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:8}}>
+            {[["today","오늘"],["7d","7일"],["30d","30일"],["all","전체"]].map(([id,lb])=><button key={id} onClick={()=>setDashRange(id)} style={{padding:"8px 0",border:"none",borderRadius:10,fontSize:12,fontWeight:900,background:dashRange===id?"#7C3AED":"#F3F4F6",color:dashRange===id?"#fff":"#374151"}}>{lb}</button>)}
+          </div>
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:3}}>
+            <button onClick={()=>setDashKid("all")} style={pill(dashKid==="all","#7C3AED")}>전체</button>
+            {kids.map(k=><button key={k.id} onClick={()=>setDashKid(k.id)} style={pill(String(dashKid)===String(k.id),gender(k.gender).accent)}>{gender(k.gender).emoji} {k.name}</button>)}
+          </div>
+        </Section>
+
+        {dashRecs.length===0?<Empty text="조건에 맞는 기록이 없어요" sub="기간이나 이름 필터를 바꿔보세요" emoji="📊"/>:<>
+          <Section label="핵심 요약" mb={14}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[
+                {k:"총 기록",v:dashSummary.total,b:"#EFF6FF",c:"#2563EB"},
+                {k:"미열+고열",v:dashSummary.fever+dashSummary.high,b:"#FFF7ED",c:"#EA580C"},
+                {k:"고열",v:dashSummary.high,b:"#FEF2F2",c:"#DC2626"},
+                {k:"메모 있음",v:dashSummary.note,b:"#ECFDF5",c:"#059669"}
+              ].map(x=><div key={x.k} style={{background:x.b,borderRadius:15,padding:"12px"}}><div style={{fontSize:12,fontWeight:900,color:"#6B7280"}}>{x.k}</div><div style={{fontSize:23,fontWeight:900,color:x.c,marginTop:2}}>{x.v}</div></div>)}
+            </div>
+          </Section>
+
+          <Section label="범례별 특이사항" mb={14}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <LegendBox bg="#FEF2F2" color="#B91C1C" label="🔴 고열 38.5°↑" count={dashSummary.high}/>
+              <LegendBox bg="#FFF7ED" color="#C2410C" label="🟠 미열 37.5°↑" count={dashSummary.fever}/>
+              <LegendBox bg="#FDF2F8" color="#BE185D" label="🔴 타이레놀" count={dashSummary.tylenol}/>
+              <LegendBox bg="#EFF6FF" color="#1D4ED8" label="🔵 부루펜" count={dashSummary.brufen}/>
+              <LegendBox bg="#ECFDF5" color="#047857" label="🌿 기침약" count={dashSummary.cough}/>
+              <LegendBox bg="#F3F4F6" color="#374151" label="📝 메모" count={dashSummary.note}/>
+            </div>
+          </Section>
+
+          <Section label="이름별 요약" mb={14}>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {byKid.map(x=>{
+                const c=gender(x.kid.gender);
+                return <div key={x.kid.id} style={{background:c.bg,border:`1.5px solid ${c.badge}`,borderRadius:16,padding:"12px 13px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                    <div style={{fontSize:26}}>{c.emoji}</div>
+                    <div style={{flex:1}}><div style={{fontSize:16,fontWeight:900,color:"#1E3A5F"}}>{x.kid.name}</div><div style={{fontSize:12,color:c.accent,fontWeight:900}}>{c.label}</div></div>
+                    <div style={{textAlign:"right"}}><div style={{fontSize:12,color:"#6B7280",fontWeight:900}}>최고 체온</div><div style={{fontSize:18,fontWeight:900,color:x.max==="-"?"#6B7280":levelColor(x.max)}}>{x.max==="-"?"-":`${x.max}°`}</div></div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+                    {[["기록",x.count,"#fff"],["미열↑",x.fever,"#FFF7ED"],["고열",x.high,"#FEF2F2"],["메모",x.note,"#ECFDF5"]].map(([k,v,b])=><div key={k} style={{background:b,borderRadius:10,padding:"8px 4px",textAlign:"center"}}><div style={{fontSize:10,color:"#6B7280",fontWeight:900}}>{k}</div><div style={{fontSize:17,fontWeight:900}}>{v}</div></div>)}
+                  </div>
+                  {x.latest&&<div style={{marginTop:8,fontSize:12,color:"#6B7280",fontWeight:800}}>최근 기록: {fmt(x.latest.ts).dateKo} {fmt(x.latest.ts).time} · {x.latest.temp}° · {med(x.latest.med).label}</div>}
+                </div>
+              })}
+            </div>
+          </Section>
+
+          <Section label="날짜별 특이사항 타임라인" mb={6}>
+            <div style={{display:"flex",flexDirection:"column",gap:10,maxHeight:520,overflowY:"auto",paddingRight:2}}>
+              {byDate.map(day=><div key={day.key} style={card}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div style={{fontSize:14,fontWeight:900,color:"#1E3A5F"}}>{day.label}</div>
+                  <div style={{fontSize:12,color:"#6B7280",fontWeight:900}}>{day.items.length}건</div>
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+                  {day.counts.high>0&&<span style={{background:"#FEE2E2",color:"#B91C1C",padding:"4px 8px",borderRadius:999,fontSize:11,fontWeight:900}}>고열 {day.counts.high}</span>}
+                  {day.counts.fever>0&&<span style={{background:"#FFEDD5",color:"#C2410C",padding:"4px 8px",borderRadius:999,fontSize:11,fontWeight:900}}>미열↑ {day.counts.fever}</span>}
+                  {day.counts.tylenol>0&&<span style={{background:"#FCE7F3",color:"#BE185D",padding:"4px 8px",borderRadius:999,fontSize:11,fontWeight:900}}>타이레놀 {day.counts.tylenol}</span>}
+                  {day.counts.brufen>0&&<span style={{background:"#DBEAFE",color:"#1D4ED8",padding:"4px 8px",borderRadius:999,fontSize:11,fontWeight:900}}>부루펜 {day.counts.brufen}</span>}
+                  {day.counts.cough>0&&<span style={{background:"#D1FAE5",color:"#047857",padding:"4px 8px",borderRadius:999,fontSize:11,fontWeight:900}}>기침약 {day.counts.cough}</span>}
+                  {day.counts.note>0&&<span style={{background:"#E5E7EB",color:"#374151",padding:"4px 8px",borderRadius:999,fontSize:11,fontWeight:900}}>메모 {day.counts.note}</span>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                  {day.items.map(r=>{
+                    const k=getKid(r.kidId), c=gender(k?.gender), m=med(r.med), lv=level(r.temp);
+                    return <div key={r.id} style={{background:"#fff",borderRadius:12,padding:"10px",display:"flex",gap:10,alignItems:"center"}}>
+                      <div style={{minWidth:52,textAlign:"center"}}><div style={{fontSize:19}}>{c.emoji}</div><div style={{fontSize:12,fontWeight:900,color:"#1E3A5F"}}>{k?.name||"??"}</div></div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                          <span style={{fontSize:13,fontWeight:900}}>{fmt(r.ts).time}</span>
+                          <span style={{fontSize:13,fontWeight:900,color:levelColor(r.temp)}}>{r.temp}°</span>
+                          <span style={{fontSize:11,fontWeight:900,padding:"3px 7px",borderRadius:999,background:lv==="high"?"#FEE2E2":lv==="fever"?"#FFEDD5":"#DCFCE7",color:lv==="high"?"#B91C1C":lv==="fever"?"#C2410C":"#15803D"}}>{levelText(r.temp)}</span>
+                          <span style={{fontSize:11,fontWeight:900,padding:"3px 7px",borderRadius:999,background:m.color+"22",color:m.color}}>{m.emoji} {m.label}</span>
+                        </div>
+                        {r.note&&<div style={{fontSize:12,color:"#6B7280",marginTop:4,wordBreak:"break-word"}}>📝 {r.note}</div>}
+                      </div>
+                    </div>
+                  })}
+                </div>
+              </div>)}
+            </div>
+          </Section>
+        </>}
+      </>}
+
+      {view==="input"&&activeKid&&<>
+        <Header title={`${activeKid.name} ${edit?"기록 수정":"기록 입력"}`} onBack={()=>setView(edit?"history":"home")}/>
+        <Section label="날짜와 시간">
+          <div style={{display:"grid",gridTemplateColumns:"minmax(0,1.2fr) minmax(0,.8fr)",gap:8,width:"100%"}}>
+            <input type="date" value={ds} onChange={e=>setDs(e.target.value)} style={inputStyle}/>
+            <input type="time" value={tm} onChange={e=>setTm(e.target.value)} style={inputStyle}/>
+          </div>
+        </Section>
+        <Section label="체온"><TempPicker temp={temp} setTemp={setTemp}/><div style={{textAlign:"center",marginTop:8,fontSize:13,fontWeight:900,color:levelColor(temp)}}>{levelText(temp)}</div></Section>
+        <Section label="투약"><MedPicker value={medId} setValue={setMedId}/></Section>
+        {interval&&<div style={{background:interval.diff<4?"#FEF2F2":"#F9FAFB",border:`1.5px solid ${interval.diff<4?"#FCA5A5":"#E5E7EB"}`,borderRadius:14,padding:12,marginBottom:16,fontSize:13,lineHeight:1.45,color:interval.diff<4?"#B91C1C":"#4B5563",fontWeight:800}}>최근 {med(medId).label.replace("기침약+","")} 계열 기록: {fmt(interval.ts).short} {fmt(interval.ts).time} · 약 {Math.abs(interval.diff).toFixed(1)}시간 차이<br/>복용 간격 판단용 참고 표시입니다.</div>}
+        <Section label="메모"><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="예: 식후 복용, 기침 심함, 잠들기 전, 병원 다녀옴" maxLength={80} style={{...inputStyle,minHeight:82,resize:"none",fontSize:14,fontWeight:700}}/></Section>
+        <button onClick={submitRecord} disabled={!medId} style={{...mainBtn(medId?gender(activeKid.gender).accent:"#D1D5DB"),cursor:medId?"pointer":"default"}}>{edit?"수정 완료":"기록 저장"}</button>
+      </>}
+
+      {view==="history"&&<>
+        <Header title="기록 이력" onBack={()=>setView("home")}/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:10}}>
+          {[["today","오늘"],["24h","24시간"],["fever","미열↑"],["all","전체"]].map(([id,lb])=><button key={id} onClick={()=>setHFilter(id)} style={{padding:"8px 0",border:"none",borderRadius:10,fontSize:12,fontWeight:900,background:hFilter===id?"#3B82F6":"#F3F4F6",color:hFilter===id?"#fff":"#374151"}}>{lb}</button>)}
+        </div>
+        <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:8}}>
+          <button onClick={()=>setHKid("all")} style={pill(hKid==="all","#3B82F6")}>전체</button>
+          {kids.map(k=><button key={k.id} onClick={()=>setHKid(k.id)} style={pill(String(hKid)===String(k.id),gender(k.gender).accent)}>{gender(k.gender).emoji} {k.name}</button>)}
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <button onClick={copyToday} style={action("#F0FDF4","#16A34A")}>📋 오늘 복사</button>
+          <button onClick={exportCSV} style={action("#EFF6FF","#3B82F6")}>⬇️ CSV</button>
+          <button onClick={exportJSON} style={action("#FEF3C7","#B45309")}>💾 백업</button>
+        </div>
+        {history.length===0?<Empty text="기록이 없습니다"/>:<div style={{display:"flex",flexDirection:"column",gap:9,maxHeight:490,overflowY:"auto"}}>
+          {history.map(r=>{
+            const k=getKid(r.kidId), c=gender(k?.gender), f=fmt(r.ts), m=med(r.med);
+            return <div key={r.id} style={{...card,display:"flex",gap:11,alignItems:"center"}}>
+              <div style={{minWidth:54,textAlign:"center"}}><div style={{fontSize:20}}>{c.emoji}</div><div style={{fontSize:12,fontWeight:900,color:"#1E3A5F"}}>{k?.name||"??"}</div><div style={{fontSize:21,fontWeight:900,color:levelColor(r.temp)}}>{r.temp}°</div></div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:900,color:"#374151"}}><span style={{color:m.color}}>{m.emoji}</span> {m.label} · {levelText(r.temp)}</div>
+                <div style={{fontSize:12,color:"#9CA3AF",fontWeight:800,marginTop:2}}>{f.dateKo} {f.time}</div>
+                {r.note&&<div style={{fontSize:12,color:"#6B7280",marginTop:4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>📝 {r.note}</div>}
+              </div>
+              {confirm===r.id?<div style={{display:"flex",flexDirection:"column",gap:4}}><button onClick={()=>deleteRecord(r.id)} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:8,padding:"5px 9px",fontSize:12,fontWeight:900}}>삭제</button><button onClick={()=>setConfirm(null)} style={{background:"#E5E7EB",color:"#374151",border:"none",borderRadius:8,padding:"5px 9px",fontSize:12,fontWeight:900}}>취소</button></div>:<div style={{display:"flex",flexDirection:"column",gap:4}}><button onClick={()=>openEdit(r)} style={{background:"none",border:"none",fontSize:17,padding:3}}>✏️</button><button onClick={()=>setConfirm(r.id)} style={{background:"none",border:"none",fontSize:17,padding:3}}>🗑</button></div>}
+            </div>
+          })}
+        </div>}
+      </>}
+
+      {view==="kids"&&<>
+        <Header title="아이 관리" onBack={()=>kids.length?setView("home"):setView("kids")} right={<button onClick={()=>openKidForm(null)} style={{background:"#3B82F6",color:"#fff",border:"none",borderRadius:12,padding:"9px 13px",fontSize:14,fontWeight:900}}>+ 추가</button>}/>
+        {kids.length===0?<Empty text="등록된 아이가 없어요" sub="오른쪽 위 + 추가를 눌러주세요"/>:<div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {kids.map(k=>{
+            const c=gender(k.gender), cnt=recs.filter(r=>String(r.kidId)===String(k.id)).length;
+            return <div key={k.id} style={{display:"flex",alignItems:"center",gap:13,background:c.bg,border:`2px solid ${c.badge}`,borderRadius:16,padding:"13px 14px"}}>
+              <div style={{fontSize:34}}>{c.emoji}</div>
+              <div style={{flex:1}}><div style={{fontSize:17,fontWeight:900,color:"#1E3A5F"}}>{k.name}</div><div style={{fontSize:12,color:c.accent,fontWeight:900}}>{c.label} · 기록 {cnt}건</div></div>
+              <button onClick={()=>openKidForm(k)} style={{background:"#fff",border:"1.5px solid #E5E7EB",borderRadius:10,padding:"8px 12px",fontSize:13,fontWeight:900}}>수정</button>
+            </div>
+          })}
+        </div>}
+        <div style={{height:1,background:"#E5E7EB",margin:"18px 0"}}/>
+        <Section label="백업 관리">
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <button onClick={exportJSON} style={action("#FEF3C7","#B45309")}>💾 백업 저장</button>
+            <label style={{...action("#F3F4F6","#374151"),display:"flex",alignItems:"center",justifyContent:"center"}}>📂 백업 불러오기<input type="file" accept="application/json" onChange={importJSON} style={{display:"none"}}/></label>
+          </div>
+          <div style={{fontSize:12,color:"#9CA3AF",lineHeight:1.45,marginTop:8}}>GitHub Pages와 스마트폰 브라우저 저장소는 기기별로 따로 저장됩니다. 가끔 백업 파일을 저장해두면 안전합니다.</div>
+        </Section>
+      </>}
+
+      {view==="kidForm"&&<>
+        <Header title={kidForm?"아이 정보 수정":"아이 등록"} onBack={()=>setView("kids")}/>
+        <Section label="이름"><input value={kName} onChange={e=>setKName(e.target.value)} placeholder="이름을 입력하세요" maxLength={12} style={inputStyle}/></Section>
+        <Section label="구분">
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            {Object.entries(GENDERS).map(([id,c])=><button key={id} onClick={()=>setKGender(id)} style={{padding:"14px 4px",borderRadius:14,border:`2px solid ${kGender===id?c.accent:"#E5E7EB"}`,background:kGender===id?c.bg:"#F9FAFB"}}>
+              <div style={{fontSize:30}}>{c.emoji}</div>
+              <div style={{fontSize:13,fontWeight:900,color:kGender===id?c.accent:"#374151"}}>{c.label}</div>
+            </button>)}
+          </div>
+        </Section>
+        <button onClick={submitKid} disabled={!kName.trim()} style={{...mainBtn(kName.trim()?"#3B82F6":"#D1D5DB"),cursor:kName.trim()?"pointer":"default"}}>{kidForm?"수정 완료":"등록 완료"}</button>
+        {kidForm&&<div style={{marginTop:14}}>
+          {confirm===kidForm.id?<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><button onClick={()=>deleteKid(kidForm.id)} style={mainBtn("#EF4444")}>정말 삭제</button><button onClick={()=>setConfirm(null)} style={{...mainBtn("#E5E7EB"),color:"#374151"}}>취소</button></div>:<button onClick={()=>setConfirm(kidForm.id)} style={{width:"100%",padding:"14px",borderRadius:14,border:"2px solid #FCA5A5",background:"#FFF5F5",color:"#EF4444",fontSize:15,fontWeight:900}}>이 아이와 기록 삭제</button>}
+        </div>}
+      </>}
+    </div>
+  </div>
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
